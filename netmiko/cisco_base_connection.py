@@ -1,7 +1,7 @@
 """CiscoBaseConnection is netmiko SSH class for Cisco and Cisco-like platforms."""
 import re
 import time
-from typing import Collection
+from typing import Collection, Union
 
 from scrapli.driver.core.cisco_iosxe.base_driver import FAILED_WHEN_CONTAINS
 from scrapli.driver.generic.base_driver import BaseGenericDriver
@@ -252,9 +252,9 @@ class CiscoBaseConnection(BaseConnection):
 
     def send_commands(self, commands: Collection[str],
                       structured: bool = False,
-                      ) -> MultiResponse:
+                      ) -> Union[Response, MultiResponse]:
 
-        results = MultiResponse()
+        responses = MultiResponse()
         config_mode = False
         config_commands = []
 
@@ -275,7 +275,7 @@ class CiscoBaseConnection(BaseConnection):
                 result = self._send_config_commands(config_commands)
                 config_mode = False
                 config_commands = []
-                results += result
+                responses += result
                 continue
             else:
                 # if in config mode, append commands to config commands to
@@ -287,9 +287,13 @@ class CiscoBaseConnection(BaseConnection):
 
                 # send non config commands immediately
                 result = self._send_command(command, structured=structured, )
-                results.append(result)
+                responses.append(result)
 
-        return results
+        if len(responses) == 1:
+            response: Response = responses[0]
+            return response
+
+        return responses
 
     def check_enable_mode(self, check_string="#"):
         """Check if in enable mode. Return boolean."""
