@@ -49,7 +49,7 @@ setup(
         "setuptools>=38.4.0",
         "paramiko>=2.6.0",
         "scp>=0.13.2",
-        "scrapli@Add-send_any_commands",
+        "scrapli @ git+https://github.com/BrunoParadigm/scrapli.git@Add-send_any_commands",
         "tenacity",
         "ntc-templates",
         "pyserial",
