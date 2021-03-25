@@ -1,18 +1,21 @@
-"""CiscoBaseConnection is netmiko SSH class for Cisco and Cisco-like platforms."""
+"""CiscoBaseConnection is netmiko SSH class for Cisco and Cisco-like
+platforms."""
 import re
 import time
-from typing import Collection, Union
+from typing import (
+    Collection,
+    Union,
+)
 
+from netmiko.base_connection import BaseConnection
+from netmiko.scp_handler import BaseFileTransfer
+from netmiko.ssh_exception import NetmikoAuthenticationException
 from scrapli.driver.core.cisco_iosxe.base_driver import FAILED_WHEN_CONTAINS
 from scrapli.driver.generic.base_driver import BaseGenericDriver
 from scrapli.response import (
     MultiResponse,
     Response,
 )
-
-from netmiko.base_connection import BaseConnection
-from netmiko.scp_handler import BaseFileTransfer
-from netmiko.ssh_exception import NetmikoAuthenticationException
 
 
 class ConfigCommandResponse(Response):
@@ -72,7 +75,7 @@ class ConfigCommandResponse(Response):
 
         """
         console_output = f"{self.initial_prompt}{self.channel_input}\n"
-        if self.failed and self.result:
+        if self.result and self.response_prompt:
             console_output += f"{self.result}\n"
 
         return console_output
@@ -101,8 +104,14 @@ class CiscoBaseConnection(BaseConnection):
         result = ""
         try:
             __, raw_result = output.split(command)
+            prompt_index = raw_result.find(prompt)
 
-            result = raw_result.replace(prompt, "")
+            if prompt_index != -1:
+                result = raw_result[:prompt_index]
+
+            else:
+                result = raw_result
+
             result = result.strip()
         except ValueError:
             pass
@@ -119,6 +128,22 @@ class CiscoBaseConnection(BaseConnection):
                 response=response,
                 response_prompt=response_prompt)
         return resp
+
+    @staticmethod
+    def _is_prompt(string: str, prompt_symbols: Collection[str] = None):
+        if not prompt_symbols:
+            prompt_symbols = ["#", ">"]
+
+        if isinstance(prompt_symbols, str):
+            prompt_symbols = [prompt_symbols]
+
+        string = string.strip()
+
+        for sybmol in string:
+            if sybmol in string and " " not in string:
+                return True
+
+        return False
 
     def _prepare_repsonse(self, hostname, prompt, command,
                           failed_when_contains, response_class=Response):
@@ -206,12 +231,20 @@ class CiscoBaseConnection(BaseConnection):
                 pattern=re.escape(
                         command))
 
-        result = self._parse_output(output=raw_output, command=command,
+        output = self._parse_output(output=raw_output, command=command,
                                     prompt=prompt)
-
+        result = ""
         new_prompt = ""
-        if not result:
+
+        if "do" in command:
+            new_prompt = prompt
+        if not output:
             new_prompt = self.find_prompt()
+        else:
+            if self._is_prompt(output):
+                new_prompt = output
+            else:
+                result = output
 
         response = self._prepare_result(response=response,
                                         response_prompt=new_prompt,
@@ -219,7 +252,8 @@ class CiscoBaseConnection(BaseConnection):
                                         raw_result=raw_output)
         return response
 
-    def _send_config_commands(self, commands, include_mode_change=True,stop_on_fail=False):
+    def _send_config_commands(self, commands, include_mode_change=True,
+                              stop_on_fail=False):
         interactive_prompt = None
         responses = MultiResponse()
 
@@ -238,7 +272,7 @@ class CiscoBaseConnection(BaseConnection):
                                                  prompt=prompt)
 
             result = response.result
-            if not response.failed and result:
+            if not response.failed and result and not command.startswith("do"):
                 interactive_prompt = result
 
             responses.append(response)
@@ -411,7 +445,8 @@ class CiscoBaseConnection(BaseConnection):
 
                     # Search for username pattern / send username
                     if re.search(username_pattern, output, flags=re.I):
-                        # Sometimes username/password must be terminated with "\r" and not "\r\n"
+                        # Sometimes username/password must be terminated
+                        # with "\r" and not "\r\n"
                         self.write_channel(self.username + "\r")
                         time.sleep(1 * delay_factor)
                         output = self.read_channel()
@@ -419,7 +454,8 @@ class CiscoBaseConnection(BaseConnection):
 
                     # Search for password pattern / send password
                     if re.search(pwd_pattern, output, flags=re.I):
-                        # Sometimes username/password must be terminated with "\r" and not "\r\n"
+                        # Sometimes username/password must be terminated
+                        # with "\r" and not "\r\n"
                         self.write_channel(self.password + "\r")
                         time.sleep(0.5 * delay_factor)
                         output = self.read_channel()
@@ -451,7 +487,8 @@ class CiscoBaseConnection(BaseConnection):
                     # Check for device with no password configured
                     if re.search(r"assword required, but none set", output):
                         self.remote_conn.close()
-                        msg = "Login failed - Password required, but none set: {}".format(
+                        msg = "Login failed - Password required, but none " \
+                              "set: {}".format(
                                 self.host
                         )
                         raise NetmikoAuthenticationException(msg)
@@ -501,7 +538,8 @@ class CiscoBaseConnection(BaseConnection):
         self.write_channel(command + self.RETURN)
 
     def _autodetect_fs(self, cmd="dir", pattern=r"Directory of (.*)/"):
-        """Autodetect the file system on the remote device. Used by SCP operations."""
+        """Autodetect the file system on the remote device. Used by SCP
+        operations."""
         if not self.check_enable_mode():
             raise ValueError(
                     "Must be in enable mode to auto-detect the file-system.")
