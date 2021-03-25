@@ -81,8 +81,8 @@ class ConfigCommandResponse(Response):
 class CiscoBaseConnection(BaseConnection):
     """Base Class for cisco-like behavior."""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args,**kwargs):
+        super().__init__(*args, **kwargs)
         self.base_prompt = f"{self.base_prompt}#"
         self.failed_when_contains = FAILED_WHEN_CONTAINS
 
