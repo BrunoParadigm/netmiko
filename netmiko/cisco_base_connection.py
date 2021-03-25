@@ -219,14 +219,14 @@ class CiscoBaseConnection(BaseConnection):
                                         raw_result=raw_output)
         return response
 
-    def _send_config_commands(self, commands, include_mode_change=True):
+    def _send_config_commands(self, commands, include_mode_change=True,stop_on_fail=False):
         interactive_prompt = None
-        results = MultiResponse()
+        responses = MultiResponse()
 
         enter_conf_t_output = self._enter_config_mode()
 
         if include_mode_change:
-            results.append(enter_conf_t_output)
+            responses.append(enter_conf_t_output)
 
         for command in commands:
             if interactive_prompt:
@@ -241,17 +241,20 @@ class CiscoBaseConnection(BaseConnection):
             if not response.failed and result:
                 interactive_prompt = result
 
-            results.append(response)
+            responses.append(response)
+
+            if stop_on_fail and responses.failed:
+                break
 
         exit_conf_t_output = self._exit_config_mode()
 
         if include_mode_change:
-            results.append(exit_conf_t_output)
+            responses.append(exit_conf_t_output)
 
-        return results
+        return responses
 
     def send_commands(self, commands: Collection[str],
-                      structured: bool = False,
+                      structured: bool = False, stop_on_fail=False,
                       ) -> Union[Response, MultiResponse]:
 
         responses = MultiResponse()
@@ -276,6 +279,10 @@ class CiscoBaseConnection(BaseConnection):
                 config_mode = False
                 config_commands = []
                 responses += result
+
+                if stop_on_fail and responses.failed:
+                    break
+
                 continue
             else:
                 # if in config mode, append commands to config commands to
@@ -288,6 +295,9 @@ class CiscoBaseConnection(BaseConnection):
                 # send non config commands immediately
                 result = self._send_command(command, structured=structured, )
                 responses.append(result)
+
+                if stop_on_fail and responses.failed:
+                    break
 
         if len(responses) == 1:
             response: Response = responses[0]
