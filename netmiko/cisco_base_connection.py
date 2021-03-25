@@ -83,7 +83,7 @@ class CiscoBaseConnection(BaseConnection):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.base_prompt = f"{self.base_prompt}#"
+        self._base_prompt = f"{self.base_prompt}#"
         self.failed_when_contains = FAILED_WHEN_CONTAINS
 
     @staticmethod
@@ -146,7 +146,7 @@ class CiscoBaseConnection(BaseConnection):
     def _enter_config_mode(self, **kwargs):
         self.enable()
         response = self._prepare_repsonse(hostname=self.host,
-                                          prompt=self.base_prompt,
+                                          prompt=self._base_prompt,
                                           failed_when_contains=self.failed_when_contains,
                                           command="configuration terminal",
                                           response_class=ConfigCommandResponse,
@@ -161,7 +161,7 @@ class CiscoBaseConnection(BaseConnection):
 
     def _exit_config_mode(self, command="end", **kwargs):
         response = self._prepare_repsonse(hostname=self.host,
-                                          prompt=self.base_prompt,
+                                          prompt=self._base_prompt,
                                           failed_when_contains=self.failed_when_contains,
                                           command=command,
                                           response_class=ConfigCommandResponse,
@@ -179,14 +179,14 @@ class CiscoBaseConnection(BaseConnection):
     def _send_command(self, command, structured=False,
                       **kwargs):
         response = self._prepare_repsonse(hostname=self.host,
-                                          prompt=self.base_prompt,
+                                          prompt=self._base_prompt,
                                           command=command,
                                           failed_when_contains=self.failed_when_contains)
         result = self.send_command(command, use_genie=structured,
                                    **kwargs)
 
         response = self._prepare_result(response=response,
-                                        response_prompt=self.base_prompt,
+                                        response_prompt=self._base_prompt,
                                         result=result)
 
         return response
