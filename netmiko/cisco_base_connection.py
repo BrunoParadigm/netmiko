@@ -333,10 +333,6 @@ class CiscoBaseConnection(BaseConnection):
                 if stop_on_fail and responses.failed:
                     break
 
-        if len(responses) == 1:
-            response: Response = responses[0]
-            return response
-
         return responses
 
     def check_enable_mode(self, check_string="#"):
